@@ -5,7 +5,9 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Mops.Client"
         mc:Ignorable="d"
-        Title="ControlWindow" Topmost="True" WindowState="Maximized"  WindowStyle="None" AllowsTransparency="True" >
+        MouseMove="Window_MouseMove"
+        Initialized="Window_Initialized"
+        Title="ControlWindow">
 
     <Window.InputBindings>
         <KeyBinding Command="{Binding Start}" Key="Space"/>
@@ -15,7 +17,8 @@
     <Window.Background>
         <SolidColorBrush Opacity="0" Color="White"/>
     </Window.Background>
-    <StackPanel MouseEnter="StackPanel_MouseEnter" MouseLeave="StackPanel_MouseLeave" Background="AliceBlue" VerticalAlignment="Bottom" HorizontalAlignment="Right">
+    <StackPanel Width="300" MouseEnter="StackPanel_MouseEnter" MouseLeave="StackPanel_MouseLeave" Background="AliceBlue" VerticalAlignment="Bottom" HorizontalAlignment="Right">
+        <TextBlock x:Name="Console"></TextBlock>
         <Button Margin="40" Click="Start_Clicked">Start</Button>
         <Button Margin="40" Click="Stop_Clicked">Stop</Button>
     </StackPanel>

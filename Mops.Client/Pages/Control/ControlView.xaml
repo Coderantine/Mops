@@ -15,8 +15,6 @@
     <Window.Background>
         <SolidColorBrush Opacity="0" Color="White"/>
     </Window.Background>
-    <StackPanel MouseEnter="StackPanel_MouseEnter" MouseLeave="StackPanel_MouseLeave" Background="AliceBlue" VerticalAlignment="Bottom" HorizontalAlignment="Right">
-        <Button Margin="40" Click="Start_Clicked">Start</Button>
-        <Button Margin="40" Click="Stop_Clicked">Stop</Button>
-    </StackPanel>
+    <Canvas x:Name="Screen" Background="Transparent" >
+    </Canvas>
 </Window>

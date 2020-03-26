@@ -1,0 +1,21 @@
+﻿<Window x:Class="Mops.Client.ShareWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Mops.Client"
+        mc:Ignorable="d"
+        Title="MainWindow" >
+    <Window.Background>
+        <SolidColorBrush Opacity="0" Color="White"/>
+    </Window.Background>
+    <Canvas x:Name="Screen" Background="Transparent" >
+        <Rectangle x:Name="Zima" Height="30" Width="30" Canvas.Left="432" Canvas.Top="94">
+            <Rectangle.Fill>
+                <SolidColorBrush Color="#4BBEE3"></SolidColorBrush>
+            </Rectangle.Fill>
+        </Rectangle>
+
+        <!--<Rectangle x:Name="SmallScreen" Height="400" Width="400" Fill="Azure" MouseMove="Rectangle_MouseMove" Canvas.Left="954" Canvas.Top="384"></Rectangle>-->
+    </Canvas>
+</Window>
