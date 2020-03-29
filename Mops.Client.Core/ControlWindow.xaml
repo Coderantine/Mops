@@ -7,6 +7,7 @@
         mc:Ignorable="d"
         MouseMove="Window_MouseMove"
         Initialized="Window_Initialized"
+        Closing="Window_Closing"
         Title="ControlWindow">
 
     <Window.InputBindings>

@@ -1,17 +1,19 @@
-﻿using MessagePack;
+﻿using Newtonsoft.Json;
 
 namespace Mops.Client
 {
-    [MessagePackObject]
     public class MouseMoveEvent
     {
-        [Key(0)]
+        [JsonProperty("a")]
         public double WindowHeight { get; set; }
-        [Key(1)]
+
+        [JsonProperty("b")]
         public double WindowWidth { get; set; }
-        [Key(2)]
+
+        [JsonProperty("c")]
         public double MouseX { get; set; }
-        [Key(3)]
+
+        [JsonProperty("d")]
         public double MouseY { get; set; }
     }
 }
