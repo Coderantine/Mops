@@ -1,11 +1,13 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
-using MessagePack;
+using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.MixedReality.WebRTC;
 using Mops.Client.Core;
 using Newtonsoft.Json;
@@ -17,8 +19,10 @@ namespace Mops.Client
     /// </summary>
     public partial class ShareWindow : Window
     {
+        private bool _clientJoined = false;
+        private readonly ConcurrentBag<SignallingMessage> _defferedMessages = new ConcurrentBag<SignallingMessage>();
         private PeerConnection _peerConnection;
-        private NodeDssSignaler _signaler;
+        private HubConnection _hubConnection;
 
         public ShareWindow()
         {
@@ -27,9 +31,8 @@ namespace Mops.Client
 
             MouseController.RegisterCallback((x, y) =>
             {
-                Debugger.Log(0, "", $"{x}-{y}");
                 Application.Current.Dispatcher.BeginInvoke(
-                  DispatcherPriority.Background,
+                  DispatcherPriority.Render,
                   new Action(() =>
                   {
                       Canvas.SetLeft(Zima, x);
@@ -70,26 +73,35 @@ namespace Mops.Client
             _peerConnection.LocalSdpReadytoSend += Peer_LocalSdpReadytoSend;
             _peerConnection.IceCandidateReadytoSend += Peer_IceCandidateReadytoSend;
 
-            _signaler = new NodeDssSignaler()
+            _hubConnection = new HubConnectionBuilder()
+                .WithUrl(new Uri(SignallerConstants.SignallerUrl))
+                .WithAutomaticReconnect(new[] { TimeSpan.Zero, TimeSpan.Zero, TimeSpan.FromSeconds(10) })
+                .Build();
+
+            _hubConnection.On("PeerJoined", async () =>
             {
-                HttpServerAddress = "http://127.0.0.1:3000/",
-                LocalPeerId = "share",
-                RemotePeerId = "control",
-            };
-            _signaler.OnMessage += (NodeDssSignaler.Message msg) =>
+                _clientJoined = true;
+                foreach (var msg in _defferedMessages)
+                {
+                    await SendMessageAsync(msg);
+                }
+            });
+
+            _hubConnection.On<string>("Message", (message) =>
             {
+                var msg = JsonConvert.DeserializeObject<SignallingMessage>(message);
                 switch (msg.MessageType)
                 {
-                    case NodeDssSignaler.Message.WireMessageType.Offer:
+                    case SignallingMessage.WireMessageType.Offer:
                         _peerConnection.SetRemoteDescription("offer", msg.Data);
                         _peerConnection.CreateAnswer();
                         break;
 
-                    case NodeDssSignaler.Message.WireMessageType.Answer:
+                    case SignallingMessage.WireMessageType.Answer:
                         _peerConnection.SetRemoteDescription("answer", msg.Data);
                         break;
 
-                    case NodeDssSignaler.Message.WireMessageType.Ice:
+                    case SignallingMessage.WireMessageType.Ice:
                         var parts = msg.Data.Split(new string[] { msg.IceDataSeparator },
                             StringSplitOptions.RemoveEmptyEntries);
                         // Note the inverted arguments for historical reasons.
@@ -100,14 +112,15 @@ namespace Mops.Client
                         _peerConnection.AddIceCandidate(sdpMid, sdpMlineindex, candidate);
                         break;
                 }
-            };
-            _signaler.StartPollingAsync();
-            _peerConnection.DataChannelAdded += _peerConnection_DataChannelAdded;
+            });
 
+            await _hubConnection.StartAsync();
+            await _hubConnection.InvokeAsync("CreateRoom", SignallerConstants.RoomName);
 
+            _peerConnection.DataChannelAdded += PeerConnection_DataChannelAdded;
         }
 
-        private void _peerConnection_DataChannelAdded(DataChannel channel)
+        private void PeerConnection_DataChannelAdded(DataChannel channel)
         {
             Debugger.Log(0, "", "data channel created for SHARE");
             channel.MessageReceived += Channel_MessageReceived;
@@ -120,43 +133,51 @@ namespace Mops.Client
             MouseController.Move(evnt);
         }
 
-        private void Peer_LocalSdpReadytoSend(string type, string sdp)
+        private async void Peer_LocalSdpReadytoSend(string type, string sdp)
         {
-            var msg = new NodeDssSignaler.Message
+            var msg = new SignallingMessage
             {
-                MessageType = NodeDssSignaler.Message.WireMessageTypeFromString(type),
+                MessageType = SignallingMessage.WireMessageTypeFromString(type),
                 Data = sdp,
                 IceDataSeparator = "|"
             };
-            _signaler.SendMessageAsync(msg);
+            await SendDefferedMessage(msg);
         }
 
-        private void Peer_IceCandidateReadytoSend(
+        private async void Peer_IceCandidateReadytoSend(
             string candidate, int sdpMlineindex, string sdpMid)
         {
-            var msg = new NodeDssSignaler.Message
+            var msg = new SignallingMessage
             {
-                MessageType = NodeDssSignaler.Message.WireMessageType.Ice,
+                MessageType = SignallingMessage.WireMessageType.Ice,
                 Data = $"{candidate}|{sdpMlineindex}|{sdpMid}",
                 IceDataSeparator = "|"
             };
-            _signaler.SendMessageAsync(msg);
+            await SendDefferedMessage(msg);
         }
 
-        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        private async void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            if (_peerConnection != null)
-            {
-                _peerConnection.Close();
-                _peerConnection.Dispose();
-                _peerConnection = null;
-            }
+            _peerConnection.Close();
+            _peerConnection.Dispose();
+            await _hubConnection.InvokeAsync("LeaveRoom", SignallerConstants.RoomName);
+        }
 
-            if (_signaler != null)
+        private async Task SendDefferedMessage(SignallingMessage message)
+        {
+            if (_clientJoined)
             {
-                _signaler.StopPollingAsync();
-                _signaler = null;
+                await SendMessageAsync(message);
             }
+            else
+            {
+                _defferedMessages.Add(message);
+            }
+        }
+
+        private async Task SendMessageAsync(SignallingMessage message)
+        {
+            await _hubConnection.InvokeAsync("SendMessage", SignallerConstants.RoomName, JsonConvert.SerializeObject(message));
         }
     }
 }

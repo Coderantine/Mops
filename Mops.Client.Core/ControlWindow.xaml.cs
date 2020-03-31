@@ -2,10 +2,12 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
-using MessagePack;
+using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.MixedReality.WebRTC;
 using Mops.Client.Core;
 using Newtonsoft.Json;
@@ -20,7 +22,7 @@ namespace Mops.Client
         private bool _shouldHideCursor = false;
         private bool _cursorIsHidden = false;
         private PeerConnection _peerConnection;
-        private NodeDssSignaler _signaler;
+        private HubConnection _hubConnection;
         private DataChannel _dc;
 
         public ControlWindow()
@@ -139,29 +141,31 @@ namespace Mops.Client
 
             Debugger.Log(0, "", "Peer connection initialized successfully.\n");
 
-            _peerConnection.LocalSdpReadytoSend += Peer_LocalSdpReadytoSend;
+            _peerConnection.LocalSdpReadytoSend += Peer_LocalSdpReadytoSendAsync;
             _peerConnection.IceCandidateReadytoSend += Peer_IceCandidateReadytoSend;
 
-            _signaler = new NodeDssSignaler()
+            _hubConnection = new HubConnectionBuilder()
+                .WithUrl(new Uri(SignallerConstants.SignallerUrl))
+                .AddJsonProtocol()
+                .WithAutomaticReconnect(new[] { TimeSpan.Zero, TimeSpan.Zero, TimeSpan.FromSeconds(10) })
+                .Build();
+
+
+            _hubConnection.On<string>("Message", (message) =>
             {
-                HttpServerAddress = "http://127.0.0.1:3000/",
-                LocalPeerId = "control",
-                RemotePeerId = "share",
-            };
-            _signaler.OnMessage += (NodeDssSignaler.Message msg) =>
-            {
+                var msg = JsonConvert.DeserializeObject<SignallingMessage>(message);
                 switch (msg.MessageType)
                 {
-                    case NodeDssSignaler.Message.WireMessageType.Offer:
+                    case SignallingMessage.WireMessageType.Offer:
                         _peerConnection.SetRemoteDescription("offer", msg.Data);
                         _peerConnection.CreateAnswer();
                         break;
 
-                    case NodeDssSignaler.Message.WireMessageType.Answer:
+                    case SignallingMessage.WireMessageType.Answer:
                         _peerConnection.SetRemoteDescription("answer", msg.Data);
                         break;
 
-                    case NodeDssSignaler.Message.WireMessageType.Ice:
+                    case SignallingMessage.WireMessageType.Ice:
                         var parts = msg.Data.Split(new string[] { msg.IceDataSeparator },
                             StringSplitOptions.RemoveEmptyEntries);
                         // Note the inverted arguments for historical reasons.
@@ -172,41 +176,45 @@ namespace Mops.Client
                         _peerConnection.AddIceCandidate(sdpMid, sdpMlineindex, candidate);
                         break;
                 }
-            };
-            _signaler.StartPollingAsync();
+            });
+
+            await _hubConnection.StartAsync();
+            await _hubConnection.InvokeAsync("JoinRoom", SignallerConstants.RoomName);
         }
 
-        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        private async void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            if (_peerConnection != null)
-            {
-                _peerConnection.Close();
-                _peerConnection.Dispose();
-                _peerConnection = null;
-            }
+            _peerConnection.Close();
+            _peerConnection.Dispose();
+            await _hubConnection.InvokeAsync("LeaveRoom", SignallerConstants.RoomName);
         }
 
-        private void Peer_LocalSdpReadytoSend(string type, string sdp)
+        private async void Peer_LocalSdpReadytoSendAsync(string type, string sdp)
         {
-            var msg = new NodeDssSignaler.Message
+            var msg = new SignallingMessage
             {
-                MessageType = NodeDssSignaler.Message.WireMessageTypeFromString(type),
+                MessageType = SignallingMessage.WireMessageTypeFromString(type),
                 Data = sdp,
                 IceDataSeparator = "|"
             };
-            _signaler.SendMessageAsync(msg);
+            await SendMessageAsync(msg);
         }
 
-        private void Peer_IceCandidateReadytoSend(
+        private async void Peer_IceCandidateReadytoSend(
             string candidate, int sdpMlineindex, string sdpMid)
         {
-            var msg = new NodeDssSignaler.Message
+            var msg = new SignallingMessage
             {
-                MessageType = NodeDssSignaler.Message.WireMessageType.Ice,
+                MessageType = SignallingMessage.WireMessageType.Ice,
                 Data = $"{candidate}|{sdpMlineindex}|{sdpMid}",
                 IceDataSeparator = "|"
             };
-            _signaler.SendMessageAsync(msg);
+            await SendMessageAsync(msg);
+        }
+
+        private async Task SendMessageAsync(SignallingMessage message)
+        {
+            await _hubConnection.InvokeAsync("SendMessage", SignallerConstants.RoomName, JsonConvert.SerializeObject(message));
         }
     }
 }
