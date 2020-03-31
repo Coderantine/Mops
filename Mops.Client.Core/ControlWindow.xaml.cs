@@ -123,8 +123,7 @@ namespace Mops.Client
             var config = new PeerConnectionConfiguration
             {
                 IceServers = new List<IceServer> {
-            new IceServer{ Urls = { "stun:stun.l.google.com:19302" } }
-        }
+            new IceServer{ Urls = { "stun:stun.l.google.com:19302", "stun:stun.l.google.com:19302" } }
             };
 
             _peerConnection.Connected += () =>
@@ -137,7 +136,7 @@ namespace Mops.Client
             };
 
             await _peerConnection.InitializeAsync(config);
-            _dc = await _peerConnection.AddDataChannelAsync("vzgo", true, true);
+            _dc = await _peerConnection.AddDataChannelAsync(14, "vzgo", true, true);
 
             Debugger.Log(0, "", "Peer connection initialized successfully.\n");
 

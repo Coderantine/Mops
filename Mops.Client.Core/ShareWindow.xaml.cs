@@ -23,7 +23,7 @@ namespace Mops.Client
         private readonly ConcurrentBag<SignallingMessage> _defferedMessages = new ConcurrentBag<SignallingMessage>();
         private PeerConnection _peerConnection;
         private HubConnection _hubConnection;
-
+        private DataChannel _dc;
         public ShareWindow()
         {
             InitializeComponent();
@@ -53,9 +53,10 @@ namespace Mops.Client
             var config = new PeerConnectionConfiguration
             {
                 IceServers = new List<IceServer> {
-            new IceServer{ Urls = { "stun:stun.l.google.com:19302" } }
+            new IceServer{ Urls = { "stun:numb.viagenie.ca", "stun:stun.l.google.com:19302"  }, TurnPassword = "babsest4U%%", TurnUserName = "babgev@gmail.com"}
         }
             };
+            //_peerConnection.DataChannelAdded += PeerConnection_DataChannelAdded;
 
             _peerConnection.Connected += () =>
             {
@@ -67,6 +68,10 @@ namespace Mops.Client
             };
 
             await _peerConnection.InitializeAsync(config);
+            _peerConnection.DataChannelAdded += PeerConnection_DataChannelAdded;
+            _dc = await _peerConnection.AddDataChannelAsync(14, "vzgo", true, true);
+            _dc.StateChanged += Dc_StateChanged;
+            _dc.MessageReceived += Channel_MessageReceived;
 
             Debugger.Log(0, "", "Peer connection initialized successfully.\n");
 
@@ -117,7 +122,12 @@ namespace Mops.Client
             await _hubConnection.StartAsync();
             await _hubConnection.InvokeAsync("CreateRoom", SignallerConstants.RoomName);
 
-            _peerConnection.DataChannelAdded += PeerConnection_DataChannelAdded;
+        }
+
+        private void Dc_StateChanged()
+        {
+            var z = _dc.State;
+            Debugger.Log(0, "", z.ToString());
         }
 
         private void PeerConnection_DataChannelAdded(DataChannel channel)
