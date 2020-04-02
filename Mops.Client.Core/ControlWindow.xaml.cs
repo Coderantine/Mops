@@ -123,7 +123,8 @@ namespace Mops.Client
             var config = new PeerConnectionConfiguration
             {
                 IceServers = new List<IceServer> {
-            new IceServer{ Urls = { "stun:stun.l.google.com:19302", "stun:stun.l.google.com:19302" } }
+            new IceServer{Urls = { "turn:35.193.0.31:3478"  }, TurnPassword = "babo8rembo8", TurnUserName = "babgev"}
+            }
             };
 
             _peerConnection.Connected += () =>
@@ -142,7 +143,6 @@ namespace Mops.Client
 
             _peerConnection.LocalSdpReadytoSend += Peer_LocalSdpReadytoSendAsync;
             _peerConnection.IceCandidateReadytoSend += Peer_IceCandidateReadytoSend;
-
             _hubConnection = new HubConnectionBuilder()
                 .WithUrl(new Uri(SignallerConstants.SignallerUrl))
                 .AddJsonProtocol()

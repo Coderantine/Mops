@@ -53,7 +53,7 @@ namespace Mops.Client
             var config = new PeerConnectionConfiguration
             {
                 IceServers = new List<IceServer> {
-            new IceServer{ Urls = { "stun:numb.viagenie.ca", "stun:stun.l.google.com:19302"  }, TurnPassword = "babsest4U%%", TurnUserName = "babgev@gmail.com"}
+            new IceServer{ Urls = { "turn:35.193.0.31:3478"  }, TurnPassword = "babo8rembo8", TurnUserName = "babgev"}
         }
             };
             //_peerConnection.DataChannelAdded += PeerConnection_DataChannelAdded;
